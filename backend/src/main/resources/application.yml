@@ -1,0 +1,59 @@
+spring:
+  application:
+    name: webox-backend
+  profiles:
+    default: local
+  datasource:
+    url: ${WEBOX_DB_URL:jdbc:mysql://127.0.0.1:3306/webox?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
+    username: ${WEBOX_DB_USER:root}
+    password: ${WEBOX_DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+  data:
+    redis:
+      host: ${WEBOX_REDIS_HOST:127.0.0.1}
+      port: ${WEBOX_REDIS_PORT:6379}
+      password: ${WEBOX_REDIS_PASSWORD:}
+      timeout: 2s
+  jackson:
+    time-zone: Asia/Shanghai
+    default-property-inclusion: non_null
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+server:
+  port: ${WEBOX_PORT:8080}
+  error:
+    include-message: never
+
+webox:
+  security:
+    issuer: webox
+    audience: webox-app
+    access-ttl-seconds: 900
+    refresh-ttl-seconds: 1209600
+    jwt-secret: ${WEBOX_JWT_SECRET:}
+  media:
+    root: ${WEBOX_MEDIA_ROOT:./uploads}
+    max-bytes: 5242880
+  rate-limit:
+    login:
+      limit: ${WEBOX_RATE_LIMIT_LOGIN:10}
+      window-seconds: ${WEBOX_RATE_LIMIT_LOGIN_WINDOW_SECONDS:600}
+    order:
+      limit: ${WEBOX_RATE_LIMIT_ORDER:10}
+      window-seconds: ${WEBOX_RATE_LIMIT_ORDER_WINDOW_SECONDS:60}
+    general:
+      limit: ${WEBOX_RATE_LIMIT_GENERAL:120}
+      window-seconds: ${WEBOX_RATE_LIMIT_GENERAL_WINDOW_SECONDS:60}
+  inventory:
+    recovery-poll-ms: ${WEBOX_INVENTORY_RECOVERY_POLL_MS:1000}
+    missing-record-grace-ms: ${WEBOX_INVENTORY_MISSING_RECORD_GRACE_MS:30000}

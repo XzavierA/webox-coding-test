@@ -1,0 +1,29 @@
+spring:
+  config:
+    activate:
+      on-profile: test
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/webox_test?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password:
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+webox:
+  security:
+    jwt-secret: test-only-signing-key-must-be-longer-than-32-bytes
+    issuer: webox-test
+    audience: webox-test
+  media:
+    root: ./target/test-uploads
+  rate-limit:
+    login:
+      limit: 1000
+      window-seconds: 600
+    order:
+      limit: 1000
+      window-seconds: 60
+    general:
+      limit: 100000
+      window-seconds: 60

@@ -1,0 +1,1111 @@
+openapi: 3.1.0
+info:
+  title: WeBox API
+  version: 1.0.0
+  description: |
+    Binding contract for the independently developed WeBox frontend and backend.
+    User-facing messages and seeded business data are English. Money is encoded
+    as a two-decimal string. Dates use Asia/Shanghai business rules.
+servers:
+  - url: http://localhost:8080
+security:
+  - bearerAuth: []
+tags:
+  - name: Auth
+  - name: App Menu
+  - name: App Profile
+  - name: App Orders
+  - name: Admin Catalog
+  - name: Admin Orders
+  - name: Admin Dashboard
+paths:
+  /api/v1/auth/register:
+    post:
+      tags: [Auth]
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RegisterRequest'}
+      responses:
+        '201': {$ref: '#/components/responses/TokenResponse'}
+        '400': {$ref: '#/components/responses/ValidationProblem'}
+        '409': {$ref: '#/components/responses/ConflictProblem'}
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LoginRequest'}
+      responses:
+        '200': {$ref: '#/components/responses/TokenResponse'}
+        '400': {$ref: '#/components/responses/ValidationProblem'}
+        '401': {$ref: '#/components/responses/AuthProblem'}
+        '429': {$ref: '#/components/responses/RateLimitProblem'}
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      operationId: refresh
+      security: []
+      description: Rotates the `webox_refresh` HttpOnly cookie. Requires an allowed Origin header.
+      responses:
+        '200': {$ref: '#/components/responses/TokenResponse'}
+        '401': {$ref: '#/components/responses/AuthProblem'}
+        '403': {$ref: '#/components/responses/ForbiddenProblem'}
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      security: []
+      description: Revokes the refresh family when present and clears the refresh cookie.
+      responses:
+        '204': {description: Logged out}
+        '403': {$ref: '#/components/responses/ForbiddenProblem'}
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      operationId: getCurrentUser
+      responses:
+        '200':
+          description: Current authenticated user
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/User'}
+        '401': {$ref: '#/components/responses/AuthProblem'}
+
+  /api/v1/app/menu:
+    get:
+      tags: [App Menu]
+      operationId: getMenu
+      parameters:
+        - {$ref: '#/components/parameters/Date'}
+        - name: q
+          in: query
+          schema: {type: string, maxLength: 50}
+        - name: categories
+          in: query
+          description: Comma-separated category values.
+          schema: {type: array, items: {$ref: '#/components/schemas/Category'}}
+          style: form
+          explode: false
+        - name: recommended
+          in: query
+          schema: {type: boolean, default: false}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/Size'}
+      responses:
+        '200':
+          description: Published menu page
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MenuPage'}
+        '400': {$ref: '#/components/responses/ValidationProblem'}
+        '401': {$ref: '#/components/responses/AuthProblem'}
+  /api/v1/app/menu/dishes/{dishId}:
+    get:
+      tags: [App Menu]
+      operationId: getDish
+      parameters:
+        - {$ref: '#/components/parameters/DishId'}
+        - {$ref: '#/components/parameters/Date'}
+      responses:
+        '200':
+          description: Dish details for a dated menu
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DishDetail'}
+        '404': {$ref: '#/components/responses/NotFoundProblem'}
+  /api/v1/app/menu/stock-stream:
+    get:
+      tags: [App Menu]
+      operationId: streamStock
+      parameters:
+        - {$ref: '#/components/parameters/Date'}
+      responses:
+        '200':
+          description: SSE stream. Events are `stock.changed`, `heartbeat`, and `resync.required`.
+          content:
+            text/event-stream:
+              schema: {type: string}
+        '401': {$ref: '#/components/responses/AuthProblem'}
+
+  /api/v1/app/preferences:
+    get:
+      tags: [App Profile]
+      operationId: getPreferences
+      responses:
+        '200':
+          description: Preferences
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Preference'}
+    put:
+      tags: [App Profile]
+      operationId: updatePreferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Preference'}
+      responses:
+        '200':
+          description: Updated preferences
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Preference'}
+        '400': {$ref: '#/components/responses/ValidationProblem'}
+  /api/v1/app/addresses:
+    get:
+      tags: [App Profile]
+      operationId: listAddresses
+      responses:
+        '200':
+          description: Saved addresses
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/Address'}
+    post:
+      tags: [App Profile]
+      operationId: createAddress
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AddressWrite'}
+      responses:
+        '201':
+          description: Created address
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Address'}
+        '400': {$ref: '#/components/responses/ValidationProblem'}
+  /api/v1/app/addresses/{addressId}:
+    patch:
+      tags: [App Profile]
+      operationId: updateAddress
+      parameters:
+        - {$ref: '#/components/parameters/AddressId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AddressWrite'}
+      responses:
+        '200':
+          description: Updated address
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Address'}
+        '403': {$ref: '#/components/responses/ForbiddenProblem'}
+        '404': {$ref: '#/components/responses/NotFoundProblem'}
+    delete:
+      tags: [App Profile]
+      operationId: deleteAddress
+      parameters:
+        - {$ref: '#/components/parameters/AddressId'}
+      responses:
+        '204': {description: Address deleted}
+        '403': {$ref: '#/components/responses/ForbiddenProblem'}
+        '404': {$ref: '#/components/responses/NotFoundProblem'}
+
+  /api/v1/app/orders/quote:
+    post:
+      tags: [App Orders]
+      operationId: quoteOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/OrderRequest'}
+      responses:
+        '200':
+          description: Authoritative quote and resolved slot
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OrderQuote'}
+        '400': {$ref: '#/components/responses/ValidationProblem'}
+        '409': {$ref: '#/components/responses/ConflictProblem'}
+  /api/v1/app/orders:
+    get:
+      tags: [App Orders]
+      operationId: listOwnOrders
+      parameters:
+        - name: status
+          in: query
+          schema: {$ref: '#/components/schemas/OrderStatus'}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/Size'}
+      responses:
+        '200':
+          description: Own order page
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OrderPage'}
+    post:
+      tags: [App Orders]
+      operationId: placeOrder
+      parameters:
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/OrderRequest'}
+      responses:
+        '200':
+          description: Replay of an already completed request
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Order'}
+        '201':
+          description: MySQL-confirmed order
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Order'}
+        '202':
+          description: Reservation accepted but MySQL confirmation is pending
+          headers:
+            Retry-After: {schema: {type: integer, minimum: 1}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OrderSubmission'}
+        '409': {$ref: '#/components/responses/ConflictProblem'}
+        '422': {$ref: '#/components/responses/BusinessProblem'}
+  /api/v1/app/order-submissions/{submissionId}:
+    get:
+      tags: [App Orders]
+      operationId: getOrderSubmission
+      parameters:
+        - {$ref: '#/components/parameters/SubmissionId'}
+      responses:
+        '200':
+          description: Processing result
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OrderSubmission'}
+        '403': {$ref: '#/components/responses/ForbiddenProblem'}
+        '404': {$ref: '#/components/responses/NotFoundProblem'}
+  /api/v1/app/orders/{orderId}:
+    get:
+      tags: [App Orders]
+      operationId: getOwnOrder
+      parameters:
+        - {$ref: '#/components/parameters/OrderId'}
+      responses:
+        '200':
+          description: Own order details
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Order'}
+        '403': {$ref: '#/components/responses/ForbiddenProblem'}
+        '404': {$ref: '#/components/responses/NotFoundProblem'}
+  /api/v1/app/orders/{orderId}/cancel:
+    post:
+      tags: [App Orders]
+      operationId: cancelOwnOrder
+      parameters:
+        - {$ref: '#/components/parameters/OrderId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/VersionRequest'}
+      responses:
+        '200':
+          description: Cancelled order
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Order'}
+        '409': {$ref: '#/components/responses/ConflictProblem'}
+
+  /api/v1/admin/dishes:
+    get:
+      tags: [Admin Catalog]
+      operationId: adminListDishes
+      parameters:
+        - name: q
+          in: query
+          schema: {type: string, maxLength: 50}
+        - name: category
+          in: query
+          schema: {$ref: '#/components/schemas/Category'}
+        - name: published
+          in: query
+          schema: {type: boolean}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/Size'}
+      responses:
+        '200':
+          description: Dish page
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AdminDishPage'}
+        '403': {$ref: '#/components/responses/ForbiddenProblem'}
+    post:
+      tags: [Admin Catalog]
+      operationId: adminCreateDish
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DishWrite'}
+      responses:
+        '201':
+          description: Created dish
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AdminDish'}
+        '400': {$ref: '#/components/responses/ValidationProblem'}
+  /api/v1/admin/dishes/{dishId}:
+    get:
+      tags: [Admin Catalog]
+      operationId: adminGetDish
+      parameters:
+        - {$ref: '#/components/parameters/DishId'}
+      responses:
+        '200':
+          description: Admin dish model
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AdminDish'}
+        '404': {$ref: '#/components/responses/NotFoundProblem'}
+    put:
+      tags: [Admin Catalog]
+      operationId: adminUpdateDish
+      parameters:
+        - {$ref: '#/components/parameters/DishId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DishWrite'}
+      responses:
+        '200':
+          description: Updated dish
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AdminDish'}
+        '409': {$ref: '#/components/responses/ConflictProblem'}
+  /api/v1/admin/dishes/{dishId}/publication:
+    patch:
+      tags: [Admin Catalog]
+      operationId: adminSetDishPublication
+      parameters:
+        - {$ref: '#/components/parameters/DishId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PublicationRequest'}
+      responses:
+        '200':
+          description: Updated dish
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AdminDish'}
+        '409': {$ref: '#/components/responses/ConflictProblem'}
+  /api/v1/admin/media/images:
+    post:
+      tags: [Admin Catalog]
+      operationId: adminUploadImage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        '201':
+          description: Stored media URL
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MediaUpload'}
+        '400': {$ref: '#/components/responses/ValidationProblem'}
+  /api/v1/admin/menus/{date}:
+    get:
+      tags: [Admin Catalog]
+      operationId: adminGetDailyMenu
+      parameters:
+        - {$ref: '#/components/parameters/PathDate'}
+      responses:
+        '200':
+          description: Menu editor model
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AdminDailyMenu'}
+        '404': {$ref: '#/components/responses/NotFoundProblem'}
+    put:
+      tags: [Admin Catalog]
+      operationId: adminUpsertDailyMenu
+      parameters:
+        - {$ref: '#/components/parameters/PathDate'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DailyMenuWrite'}
+      responses:
+        '200':
+          description: Updated menu
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AdminDailyMenu'}
+        '400': {$ref: '#/components/responses/ValidationProblem'}
+        '409': {$ref: '#/components/responses/ConflictProblem'}
+  /api/v1/admin/menus/{date}/publish:
+    post:
+      tags: [Admin Catalog]
+      operationId: adminPublishDailyMenu
+      parameters:
+        - {$ref: '#/components/parameters/PathDate'}
+      responses:
+        '200':
+          description: Published menu
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AdminDailyMenu'}
+        '409': {$ref: '#/components/responses/ConflictProblem'}
+
+  /api/v1/admin/orders:
+    get:
+      tags: [Admin Orders]
+      operationId: adminListOrders
+      parameters:
+        - name: q
+          in: query
+          schema: {type: string, maxLength: 50}
+        - {$ref: '#/components/parameters/Date'}
+        - name: mealSlot
+          in: query
+          schema: {$ref: '#/components/schemas/MealSlot'}
+        - name: status
+          in: query
+          schema: {$ref: '#/components/schemas/OrderStatus'}
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/Size'}
+      responses:
+        '200':
+          description: All-order page
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OrderPage'}
+        '403': {$ref: '#/components/responses/ForbiddenProblem'}
+  /api/v1/admin/orders/{orderId}:
+    get:
+      tags: [Admin Orders]
+      operationId: adminGetOrder
+      parameters:
+        - {$ref: '#/components/parameters/OrderId'}
+      responses:
+        '200':
+          description: Order with history
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Order'}
+        '404': {$ref: '#/components/responses/NotFoundProblem'}
+  /api/v1/admin/orders/{orderId}/transitions:
+    post:
+      tags: [Admin Orders]
+      operationId: adminTransitionOrder
+      parameters:
+        - {$ref: '#/components/parameters/OrderId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/OrderTransitionRequest'}
+      responses:
+        '200':
+          description: Transitioned order
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Order'}
+        '409': {$ref: '#/components/responses/ConflictProblem'}
+  /api/v1/admin/dashboard:
+    get:
+      tags: [Admin Dashboard]
+      operationId: adminGetDashboard
+      parameters:
+        - {$ref: '#/components/parameters/Date'}
+        - name: refresh
+          in: query
+          schema: {type: boolean, default: false}
+      responses:
+        '200':
+          description: Dashboard snapshot from real orders
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Dashboard'}
+        '403': {$ref: '#/components/responses/ForbiddenProblem'}
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Date:
+      name: date
+      in: query
+      required: false
+      schema: {type: string, format: date}
+    PathDate:
+      name: date
+      in: path
+      required: true
+      schema: {type: string, format: date}
+    Page:
+      name: page
+      in: query
+      schema: {type: integer, minimum: 0, default: 0}
+    Size:
+      name: size
+      in: query
+      schema: {type: integer, minimum: 1, maximum: 100, default: 20}
+    DishId:
+      name: dishId
+      in: path
+      required: true
+      schema: {type: integer, format: int64, minimum: 1}
+    AddressId:
+      name: addressId
+      in: path
+      required: true
+      schema: {type: integer, format: int64, minimum: 1}
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema: {type: integer, format: int64, minimum: 1}
+    SubmissionId:
+      name: submissionId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: {type: string, format: uuid}
+  responses:
+    TokenResponse:
+      description: Access token response; also sets the rotating `webox_refresh` cookie.
+      headers:
+        Set-Cookie:
+          schema: {type: string}
+          description: webox_refresh; HttpOnly; SameSite=Strict; Path=/api/v1/auth; Max-Age=1209600; Secure outside local profile
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/TokenResponse'}
+    ValidationProblem:
+      description: Invalid request
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    AuthProblem:
+      description: Authentication required or invalid credentials
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    ForbiddenProblem:
+      description: Authenticated actor is not permitted
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    NotFoundProblem:
+      description: Resource not found
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    ConflictProblem:
+      description: State, idempotency, active-order, or inventory conflict
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    BusinessProblem:
+      description: Business precondition requires user review
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    RateLimitProblem:
+      description: Rate limited
+      headers:
+        Retry-After: {schema: {type: integer, minimum: 1}}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+  schemas:
+    Role:
+      type: string
+      enum: [EMPLOYEE, ADMIN]
+    Category:
+      type: string
+      enum: [CHINESE, WESTERN, JAPANESE, LIGHT_MEAL, KOREAN, SOUTHEAST_ASIAN]
+    SpiceLevel:
+      type: string
+      enum: [NONE, MILD, MEDIUM, HOT]
+    Allergen:
+      type: string
+      enum: [PEANUTS, DAIRY, EGG, GLUTEN, SOY, FISH, SHELLFISH]
+    TasteIntensity:
+      type: string
+      enum: [LIGHT, BALANCED, RICH]
+    MealSlot:
+      type: string
+      enum: [LUNCH, DINNER]
+    OrderStatus:
+      type: string
+      enum: [PENDING, CONFIRMED, COMPLETED, CANCELLED]
+    Money:
+      type: string
+      pattern: '^\d{1,8}\.\d{2}$'
+      examples: ['22.50']
+    User:
+      type: object
+      required: [id, email, displayName, role]
+      properties:
+        id: {type: integer, format: int64}
+        email: {type: string, format: email}
+        displayName: {type: string}
+        role: {$ref: '#/components/schemas/Role'}
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password, displayName]
+      properties:
+        email: {type: string, format: email, maxLength: 200}
+        password: {type: string, minLength: 8, maxLength: 72, pattern: '^(?=.*[A-Za-z])(?=.*\d).+$'}
+        displayName: {type: string, minLength: 1, maxLength: 100}
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email: {type: string, format: email, maxLength: 200}
+        password: {type: string, minLength: 1, maxLength: 72}
+    TokenResponse:
+      type: object
+      required: [accessToken, tokenType, expiresIn, user]
+      properties:
+        accessToken: {type: string}
+        tokenType: {type: string, const: Bearer}
+        expiresIn: {type: integer, const: 900}
+        user: {$ref: '#/components/schemas/User'}
+    FieldError:
+      type: object
+      required: [field, message]
+      properties:
+        field: {type: string}
+        message: {type: string}
+    Problem:
+      type: object
+      required: [type, title, status, detail, code, correlationId]
+      properties:
+        type: {type: string, format: uri}
+        title: {type: string}
+        status: {type: integer}
+        detail: {type: string}
+        code: {type: string}
+        correlationId: {type: string}
+        fieldErrors:
+          type: array
+          items: {$ref: '#/components/schemas/FieldError'}
+        details: {type: object, additionalProperties: true}
+    PageMeta:
+      type: object
+      required: [page, size, totalItems, totalPages]
+      properties:
+        page: {type: integer, minimum: 0}
+        size: {type: integer, minimum: 1}
+        totalItems: {type: integer, format: int64, minimum: 0}
+        totalPages: {type: integer, minimum: 0}
+    OptionValue:
+      type: object
+      required: [id, name, priceDelta]
+      properties:
+        id: {type: integer, format: int64}
+        name: {type: string}
+        priceDelta: {$ref: '#/components/schemas/Money'}
+    OptionGroup:
+      type: object
+      required: [id, name, selectionType, required, minSelections, maxSelections, values]
+      properties:
+        id: {type: integer, format: int64}
+        name: {type: string}
+        selectionType: {type: string, enum: [SINGLE, MULTIPLE]}
+        required: {type: boolean}
+        minSelections: {type: integer, minimum: 0}
+        maxSelections: {type: integer, minimum: 1}
+        values: {type: array, items: {$ref: '#/components/schemas/OptionValue'}}
+    DishCard:
+      type: object
+      required: [menuItemId, dishId, name, description, imageUrl, basePrice, category, allergens, spiceLevel, remainingStock, stockVersion, lowStock, soldOut, preferenceMatches]
+      properties:
+        menuItemId: {type: integer, format: int64}
+        dishId: {type: integer, format: int64}
+        name: {type: string}
+        description: {type: string}
+        imageUrl: {type: string}
+        basePrice: {$ref: '#/components/schemas/Money'}
+        category: {$ref: '#/components/schemas/Category'}
+        allergens: {type: array, items: {$ref: '#/components/schemas/Allergen'}}
+        spiceLevel: {$ref: '#/components/schemas/SpiceLevel'}
+        remainingStock: {type: integer, minimum: 0}
+        stockVersion: {type: integer, format: int64, minimum: 0}
+        lowStock: {type: boolean}
+        soldOut: {type: boolean}
+        preferenceMatches: {type: array, items: {type: string}}
+    DishDetail:
+      allOf:
+        - {$ref: '#/components/schemas/DishCard'}
+        - type: object
+          required: [proteinSource, optionGroups]
+          properties:
+            proteinSource: {type: string}
+            optionGroups: {type: array, items: {$ref: '#/components/schemas/OptionGroup'}}
+    MenuPage:
+      allOf:
+        - {$ref: '#/components/schemas/PageMeta'}
+        - type: object
+          required: [date, items]
+          properties:
+            date: {type: string, format: date}
+            items: {type: array, items: {$ref: '#/components/schemas/DishCard'}}
+    Preference:
+      type: object
+      additionalProperties: false
+      required: [allergens, preferredCategories]
+      properties:
+        allergens: {type: array, uniqueItems: true, items: {$ref: '#/components/schemas/Allergen'}}
+        preferredCategories: {type: array, uniqueItems: true, items: {$ref: '#/components/schemas/Category'}}
+        spiceLevel: {anyOf: [{$ref: '#/components/schemas/SpiceLevel'}, {type: 'null'}]}
+        tasteIntensity: {anyOf: [{$ref: '#/components/schemas/TasteIntensity'}, {type: 'null'}]}
+        budgetMin: {anyOf: [{$ref: '#/components/schemas/Money'}, {type: 'null'}]}
+        budgetMax: {anyOf: [{$ref: '#/components/schemas/Money'}, {type: 'null'}]}
+    Address:
+      type: object
+      required: [id, label, addressText, isDefault]
+      properties:
+        id: {type: integer, format: int64}
+        label: {type: string}
+        addressText: {type: string}
+        isDefault: {type: boolean}
+    AddressWrite:
+      type: object
+      additionalProperties: false
+      required: [label, addressText, isDefault]
+      properties:
+        label: {type: string, maxLength: 50}
+        addressText: {type: string, minLength: 1, maxLength: 200}
+        isDefault: {type: boolean}
+    OrderLineRequest:
+      type: object
+      additionalProperties: false
+      required: [dishId, quantity, optionValueIds]
+      properties:
+        dishId: {type: integer, format: int64, minimum: 1}
+        quantity: {type: integer, minimum: 1, maximum: 5}
+        optionValueIds: {type: array, uniqueItems: true, items: {type: integer, format: int64, minimum: 1}}
+    InlineAddress:
+      allOf:
+        - {$ref: '#/components/schemas/AddressWrite'}
+        - type: object
+          required: [save]
+          properties:
+            save: {type: boolean}
+    OrderRequest:
+      type: object
+      additionalProperties: false
+      required: [deliveryDate, mealSlot, items]
+      properties:
+        deliveryDate: {type: string, format: date}
+        mealSlot: {$ref: '#/components/schemas/MealSlot'}
+        addressId: {type: [integer, 'null'], format: int64, minimum: 1}
+        newAddress: {anyOf: [{$ref: '#/components/schemas/InlineAddress'}, {type: 'null'}]}
+        acceptedResolvedDeliveryDate: {type: [string, 'null'], format: date}
+        acceptedResolvedMealSlot: {anyOf: [{$ref: '#/components/schemas/MealSlot'}, {type: 'null'}]}
+        items:
+          type: array
+          minItems: 1
+          maxItems: 5
+          items: {$ref: '#/components/schemas/OrderLineRequest'}
+      description: Exactly one of addressId/newAddress is required. Sum of item quantities must be at most 5.
+    QuoteLine:
+      type: object
+      required: [dishId, dishName, quantity, optionValueIds, unitPrice, subtotal]
+      properties:
+        dishId: {type: integer, format: int64}
+        dishName: {type: string}
+        quantity: {type: integer}
+        optionValueIds: {type: array, items: {type: integer, format: int64}}
+        unitPrice: {$ref: '#/components/schemas/Money'}
+        subtotal: {$ref: '#/components/schemas/Money'}
+    ExistingOrder:
+      type: object
+      required: [id, orderNumber, status]
+      properties:
+        id: {type: integer, format: int64}
+        orderNumber: {type: string}
+        status: {$ref: '#/components/schemas/OrderStatus'}
+    OrderQuote:
+      type: object
+      required: [resolvedDeliveryDate, resolvedMealSlot, slotAdjusted, lines, total, warnings, unavailableItems]
+      properties:
+        resolvedDeliveryDate: {type: string, format: date}
+        resolvedMealSlot: {$ref: '#/components/schemas/MealSlot'}
+        slotAdjusted: {type: boolean}
+        lines: {type: array, items: {$ref: '#/components/schemas/QuoteLine'}}
+        total: {$ref: '#/components/schemas/Money'}
+        warnings: {type: array, items: {type: string, enum: [BUDGET_EXCEEDED, SLOT_ADJUSTED]}}
+        unavailableItems: {type: array, items: {$ref: '#/components/schemas/InventoryConflictItem'}}
+        existingOrder: {anyOf: [{$ref: '#/components/schemas/ExistingOrder'}, {type: 'null'}]}
+    InventoryConflictItem:
+      type: object
+      required: [dishId, name, requested, remaining]
+      properties:
+        dishId: {type: integer, format: int64}
+        name: {type: string}
+        requested: {type: integer}
+        remaining: {type: integer}
+    OrderOption:
+      type: object
+      required: [groupName, valueName, priceDelta]
+      properties:
+        groupName: {type: string}
+        valueName: {type: string}
+        priceDelta: {$ref: '#/components/schemas/Money'}
+    OrderItem:
+      type: object
+      required: [id, dishId, dishName, basePrice, unitPrice, quantity, subtotal, options]
+      properties:
+        id: {type: integer, format: int64}
+        dishId: {type: integer, format: int64}
+        dishName: {type: string}
+        basePrice: {$ref: '#/components/schemas/Money'}
+        unitPrice: {$ref: '#/components/schemas/Money'}
+        quantity: {type: integer}
+        subtotal: {$ref: '#/components/schemas/Money'}
+        options: {type: array, items: {$ref: '#/components/schemas/OrderOption'}}
+    StatusHistory:
+      type: object
+      required: [fromStatus, toStatus, actorRole, actorDisplayName, createdAt]
+      properties:
+        fromStatus: {anyOf: [{$ref: '#/components/schemas/OrderStatus'}, {type: 'null'}]}
+        toStatus: {$ref: '#/components/schemas/OrderStatus'}
+        actorRole: {$ref: '#/components/schemas/Role'}
+        actorDisplayName: {type: string}
+        reason: {type: [string, 'null']}
+        createdAt: {type: string, format: date-time}
+    Order:
+      type: object
+      required: [id, orderNumber, userId, userDisplayName, deliveryDate, mealSlot, deliveryAddress, status, total, version, items, statusHistory, createdAt]
+      properties:
+        id: {type: integer, format: int64}
+        orderNumber: {type: string}
+        userId: {type: integer, format: int64}
+        userDisplayName: {type: string}
+        deliveryDate: {type: string, format: date}
+        mealSlot: {$ref: '#/components/schemas/MealSlot'}
+        deliveryAddress: {type: string}
+        status: {$ref: '#/components/schemas/OrderStatus'}
+        total: {$ref: '#/components/schemas/Money'}
+        version: {type: integer, format: int64}
+        items: {type: array, items: {$ref: '#/components/schemas/OrderItem'}}
+        statusHistory: {type: array, items: {$ref: '#/components/schemas/StatusHistory'}}
+        createdAt: {type: string, format: date-time}
+    OrderPage:
+      allOf:
+        - {$ref: '#/components/schemas/PageMeta'}
+        - type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/Order'}}
+    SubmissionState:
+      type: string
+      enum: [PROCESSING, COMPLETED, FAILED]
+    OrderSubmission:
+      type: object
+      required: [submissionId, state]
+      properties:
+        submissionId: {type: string, format: uuid}
+        state: {$ref: '#/components/schemas/SubmissionState'}
+        order: {anyOf: [{$ref: '#/components/schemas/Order'}, {type: 'null'}]}
+        failure: {anyOf: [{$ref: '#/components/schemas/Problem'}, {type: 'null'}]}
+        statusUrl: {type: string}
+    VersionRequest:
+      type: object
+      required: [expectedVersion]
+      properties:
+        expectedVersion: {type: integer, format: int64, minimum: 0}
+    OptionValueWrite:
+      type: object
+      required: [name, priceDelta, displayOrder, active]
+      properties:
+        id: {type: [integer, 'null'], format: int64}
+        name: {type: string, minLength: 1, maxLength: 80}
+        priceDelta: {$ref: '#/components/schemas/Money'}
+        displayOrder: {type: integer, minimum: 0}
+        active: {type: boolean}
+    OptionGroupWrite:
+      type: object
+      required: [name, selectionType, required, minSelections, maxSelections, displayOrder, active, values]
+      properties:
+        id: {type: [integer, 'null'], format: int64}
+        name: {type: string, minLength: 1, maxLength: 80}
+        selectionType: {type: string, enum: [SINGLE, MULTIPLE]}
+        required: {type: boolean}
+        minSelections: {type: integer, minimum: 0}
+        maxSelections: {type: integer, minimum: 1, maximum: 20}
+        displayOrder: {type: integer, minimum: 0}
+        active: {type: boolean}
+        values: {type: array, minItems: 1, items: {$ref: '#/components/schemas/OptionValueWrite'}}
+    DishWrite:
+      type: object
+      additionalProperties: false
+      required: [name, description, basePrice, category, proteinSource, spiceLevel, allergens, imageUrl, published, version, optionGroups]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 120}
+        description: {type: string, minLength: 1, maxLength: 1000}
+        basePrice: {$ref: '#/components/schemas/Money'}
+        category: {$ref: '#/components/schemas/Category'}
+        proteinSource: {type: string, minLength: 1, maxLength: 100}
+        spiceLevel: {$ref: '#/components/schemas/SpiceLevel'}
+        allergens: {type: array, uniqueItems: true, items: {$ref: '#/components/schemas/Allergen'}}
+        imageUrl: {type: string, minLength: 1, maxLength: 500}
+        published: {type: boolean}
+        version: {type: integer, format: int64, minimum: 0, description: Use 0 when creating.}
+        optionGroups: {type: array, items: {$ref: '#/components/schemas/OptionGroupWrite'}}
+    AdminDish:
+      type: object
+      required: [id, name, description, basePrice, category, proteinSource, spiceLevel, allergens, imageUrl, published, version, optionGroups]
+      properties:
+        id: {type: integer, format: int64}
+        name: {type: string}
+        description: {type: string}
+        basePrice: {$ref: '#/components/schemas/Money'}
+        category: {$ref: '#/components/schemas/Category'}
+        proteinSource: {type: string}
+        spiceLevel: {$ref: '#/components/schemas/SpiceLevel'}
+        allergens: {type: array, items: {$ref: '#/components/schemas/Allergen'}}
+        imageUrl: {type: string}
+        published: {type: boolean}
+        version: {type: integer, format: int64}
+        optionGroups: {type: array, items: {$ref: '#/components/schemas/OptionGroup'}}
+    AdminDishPage:
+      allOf:
+        - {$ref: '#/components/schemas/PageMeta'}
+        - type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/AdminDish'}}
+    PublicationRequest:
+      type: object
+      required: [published, expectedVersion]
+      properties:
+        published: {type: boolean}
+        expectedVersion: {type: integer, format: int64, minimum: 0}
+    MediaUpload:
+      type: object
+      required: [url]
+      properties:
+        url: {type: string}
+    DailyMenuItemWrite:
+      type: object
+      required: [dishId, initialStock, visible]
+      properties:
+        dishId: {type: integer, format: int64, minimum: 1}
+        initialStock: {type: integer, minimum: 0}
+        visible: {type: boolean}
+    DailyMenuWrite:
+      type: object
+      required: [expectedPublicationVersion, items]
+      properties:
+        expectedPublicationVersion: {type: integer, format: int64, minimum: 0}
+        items: {type: array, uniqueItems: true, items: {$ref: '#/components/schemas/DailyMenuItemWrite'}}
+    AdminDailyMenuItem:
+      type: object
+      required: [menuItemId, dishId, dishName, initialStock, remainingStock, visible, stockVersion]
+      properties:
+        menuItemId: {type: integer, format: int64}
+        dishId: {type: integer, format: int64}
+        dishName: {type: string}
+        initialStock: {type: integer}
+        remainingStock: {type: integer}
+        visible: {type: boolean}
+        stockVersion: {type: integer, format: int64}
+    AdminDailyMenu:
+      type: object
+      required: [date, status, publicationVersion, items]
+      properties:
+        date: {type: string, format: date}
+        status: {type: string, enum: [DRAFT, PUBLISHED]}
+        publicationVersion: {type: integer, format: int64}
+        items: {type: array, items: {$ref: '#/components/schemas/AdminDailyMenuItem'}}
+    OrderTransitionRequest:
+      type: object
+      required: [targetStatus, expectedVersion]
+      properties:
+        targetStatus: {type: string, enum: [CONFIRMED, COMPLETED, CANCELLED]}
+        expectedVersion: {type: integer, format: int64, minimum: 0}
+        reason: {type: [string, 'null'], maxLength: 500}
+    DashboardOverview:
+      type: object
+      required: [totalOrders, revenue, completed, pending, confirmed, cancelled]
+      properties:
+        totalOrders: {type: integer, minimum: 0}
+        revenue: {$ref: '#/components/schemas/Money'}
+        completed: {type: integer, minimum: 0}
+        pending: {type: integer, minimum: 0}
+        confirmed: {type: integer, minimum: 0}
+        cancelled: {type: integer, minimum: 0}
+    DishRanking:
+      type: object
+      required: [dishId, name, quantity]
+      properties:
+        dishId: {type: integer, format: int64}
+        name: {type: string}
+        quantity: {type: integer, minimum: 0}
+    MealDistribution:
+      type: object
+      required: [mealSlot, orders]
+      properties:
+        mealSlot: {$ref: '#/components/schemas/MealSlot'}
+        orders: {type: integer, minimum: 0}
+    TrendPoint:
+      type: object
+      required: [date, orders, revenue]
+      properties:
+        date: {type: string, format: date}
+        orders: {type: integer, minimum: 0}
+        revenue: {$ref: '#/components/schemas/Money'}
+    LowStockItem:
+      type: object
+      required: [dishId, name, remainingStock]
+      properties:
+        dishId: {type: integer, format: int64}
+        name: {type: string}
+        remainingStock: {type: integer, minimum: 0, maximum: 3}
+    Dashboard:
+      type: object
+      required: [asOf, date, overview, topDishes, mealDistribution, trend, lowStock]
+      properties:
+        asOf: {type: string, format: date-time}
+        date: {type: string, format: date}
+        overview: {$ref: '#/components/schemas/DashboardOverview'}
+        topDishes: {type: array, maxItems: 10, items: {$ref: '#/components/schemas/DishRanking'}}
+        mealDistribution: {type: array, items: {$ref: '#/components/schemas/MealDistribution'}}
+        trend: {type: array, minItems: 7, maxItems: 7, items: {$ref: '#/components/schemas/TrendPoint'}}
+        lowStock: {type: array, items: {$ref: '#/components/schemas/LowStockItem'}}
+
